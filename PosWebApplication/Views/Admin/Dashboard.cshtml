@@ -1,0 +1,115 @@
+﻿@model PosWebApplication.ViewModels.Admin.AdminDashboardViewModel
+@using PosWebApplication.Constraints
+
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="container mt-4">
+
+    <h1>Admin Dashboard</h1>
+
+    <hr />
+
+    <h3>User List</h3>
+
+    <table class="table table-bordered table-striped">
+
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>User ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Created Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            @for (int i = 0; i < Model.Users.Count; i++)
+            {
+                var user = Model.Users[i];
+
+                <tr>
+                    <td>@(i + 1)</td>
+
+                    <td>@user.u_id</td>
+
+                    <td>@user.name</td>
+
+                    <td>@user.email</td>
+
+                    <td>
+                        @if (user.role == UserRoles.Admin)
+                        {
+                            <span class="badge bg-success">
+                                Admin
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">
+                                User
+                            </span>
+                        }
+                    </td>
+
+                    <td>
+                        @user.created_at
+                    </td>
+
+                    <td>
+
+                        @if (user.role == UserRoles.Admin)
+                        {
+                            <span>No Action</span>
+                        }
+                        else
+                        {
+                            <form asp-controller="Admin"
+                                  asp-action="MakeAdmin"
+                                  method="post"
+                                  style="display:inline;">
+
+                                <input type="hidden"
+                                       name="userId"
+                                       value="@user.u_id" />
+
+                                <button type="submit"
+                                        class="btn btn-primary btn-sm">
+                                    Make Admin
+                                </button>
+
+                            </form>
+
+                            <form asp-controller="Admin"
+                                  asp-action="DeleteUser"
+                                  method="post"
+                                  style="display:inline;">
+
+                                <input type="hidden"
+                                       name="userId"
+                                       value="@user.u_id" />
+
+                                <button type="submit"
+                                        class="btn btn-danger btn-sm"
+                                        onclick="return confirm('Are you sure you want to delete this user?');">
+                                    Delete
+                                </button>
+
+                            </form>
+                        }
+
+                    </td>
+
+                </tr>
+            }
+
+        </tbody>
+
+    </table>
+
+</div>

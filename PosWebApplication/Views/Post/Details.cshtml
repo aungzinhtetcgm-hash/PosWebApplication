@@ -1,0 +1,225 @@
+﻿@model PosWebApplication.ViewModels.Post.PostDetailsViewModel
+
+@{
+    ViewData["Title"] = "Post Details";
+}
+
+<div class="container mt-4">
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <div class="card shadow-sm">
+
+                <div class="card-header d-flex justify-content-between align-items-center">
+
+                    <h4 class="mb-0">
+                        Post Details
+                    </h4>
+
+                    @if (Model.public_flag == "public")
+                    {
+                        <span class="badge bg-success">
+                            Public
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">
+                            Private
+                        </span>
+                    }
+
+                </div>
+
+                <div class="card-body">
+
+                    <h2 class="mb-3">
+                        @Model.title
+                    </h2>
+
+                    <p class="text-muted"
+                       style="white-space: pre-line;">
+                        @Model.description
+                    </p>
+
+                    <hr />
+
+                    <div class="mb-3">
+
+                        <strong>
+                            Created By
+                        </strong>
+
+                        <br />
+
+                        <span class="text-muted">
+                            @Model.name
+                        </span>
+
+                    </div>
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <strong>
+                                Created At
+                            </strong>
+
+                            <br />
+
+                            <span class="text-muted">
+                                @Model.created_at.ToString("yyyy-MM-dd HH:mm")
+                            </span>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <strong>
+                                Updated At
+                            </strong>
+
+                            <br />
+
+                            <span class="text-muted">
+                                @Model.updated_at.ToString("yyyy-MM-dd HH:mm")
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+
+    @if (Model.public_flag == "public")
+    {
+        <div class="row justify-content-center mt-4">
+
+            <div class="col-md-8">
+
+                <div class="card shadow-sm">
+
+                    <div class="card-header">
+
+                        <h5 class="mb-0">
+                            Comments
+                        </h5>
+
+                    </div>
+
+                    <div class="card-body">
+
+                        @if (Model.Comments.Any())
+                        {
+                            foreach (var comment in Model.Comments)
+                            {
+                                <div class="border-bottom pb-3 mb-3">
+
+                                    <div class="d-flex justify-content-between">
+
+                                        <strong>
+                                            @comment.name
+                                        </strong>
+
+                                        <small class="text-muted">
+                                            @comment.created_at.ToString("yyyy-MM-dd HH:mm")
+                                        </small>
+
+                                    </div>
+
+                                    <p class="mb-0 mt-2">
+                                        @comment.comments
+                                    </p>
+
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">
+                                No comments yet.
+                            </p>
+                        }
+
+                    </div>
+
+                </div>
+
+
+                <!-- ADD COMMENT -->
+                <div class="card shadow-sm mt-4">
+
+                    <div class="card-header">
+
+                        <h5 class="mb-0">
+                            Write a Comment
+                        </h5>
+
+                    </div>
+
+                    <div class="card-body">
+
+                        <form asp-controller="Post"
+                              asp-action="AddComment"
+                              method="post">
+
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="p_id"
+                                   value="@Model.p_id" />
+
+                            <div class="mb-3">
+
+                                <textarea name="comments"
+                                          class="form-control"
+                                          rows="4"
+                                          maxlength="1000"
+                                          placeholder="Write your comment..."></textarea>
+
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-primary">
+
+                                Comment
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    }
+
+
+    <div class="row justify-content-center mt-4">
+
+        <div class="col-md-8">
+
+            <a asp-controller="Post"
+               asp-action="Index"
+               class="btn btn-secondary">
+
+                Back
+
+            </a>
+
+        </div>
+
+    </div>
+
+</div> 
