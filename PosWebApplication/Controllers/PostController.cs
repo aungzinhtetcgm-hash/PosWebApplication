@@ -1,21 +1,23 @@
 ﻿using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PosWebApplication.Controllers;
 using PosWebApplication.DTOs.Comment;
 using PosWebApplication.DTOs.Post;
+using PosWebApplication.Entity;
 using PosWebApplication.Exceptions;
-using PosWebApplication.Services;
 using PosWebApplication.Services.Comment;
 using PosWebApplication.Services.Post;
 using PosWebApplication.ViewModels.Comment;
 using PosWebApplication.ViewModels.Post;
-using PosWebApplication.ViewModels.Post;
+using System.Security.Claims;
 
 namespace PosWebApplication.Controllers
 {
-    public class PostController : Microsoft.AspNetCore.Mvc.Controller
+    [Authorize]
+    public class PostController : BaseController
     {
         private readonly IPostService _postService;
-        private readonly SessionService _sessionService;
         private readonly IValidator<CreatePostDTO> _createValidator;
         private readonly IValidator<UpdatePostDTO> _updateValidator;
         private readonly ICommentService _commentService;
@@ -23,38 +25,39 @@ namespace PosWebApplication.Controllers
 
         public PostController(
             IPostService postService,
-            SessionService sessionService,
             IValidator<CreatePostDTO> createValidator,
             IValidator<UpdatePostDTO> updateValidator,
             ICommentService commentService,
             IValidator<CreateCommentDTO> commentValidator)
         {
             _postService = postService;
-            _sessionService = sessionService;
-
             _createValidator = createValidator;
             _updateValidator = updateValidator;
-
             _commentService = commentService;
             _commentValidator = commentValidator;
         }
 
+        // Index
+
         [HttpGet]
         public IActionResult Index()
         {
-            var currentUser = _sessionService.GetUser();
+            var u_id = GetCurrentu_id();
 
-            if (currentUser == null)
+            if (u_id == null)
             {
-                return Unauthorized();
+                return RedirectToAction(
+                    "Login",
+                    "User");
             }
 
             var model = new PostIndexViewModel();
 
-            var publicPosts = _postService.GetPublicPosts();
+            var publicPosts =
+                _postService.GetPublicPosts();
 
             model.PublicPosts = publicPosts
-                .Where(x => x.created_by == currentUser.u_id)
+                .Where(x => x.created_by == u_id.Value)
                 .Select(x => new PublicPostViewModel
                 {
                     p_id = x.p_id,
@@ -65,9 +68,9 @@ namespace PosWebApplication.Controllers
                 })
                 .ToList();
 
-            var myPosts = _postService.GetMyPosts(
-                currentUser.u_id
-            );
+            var myPosts =
+                _postService.GetMyPosts(
+                    u_id.Value);
 
             model.PrivatePosts = myPosts
                 .Where(x => x.public_flag == "private")
@@ -87,25 +90,21 @@ namespace PosWebApplication.Controllers
         [HttpGet]
         public IActionResult Create()
         {
-            var currentUser = _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
-
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(CreatePostViewModel model)
+        public IActionResult Create(
+            CreatePostViewModel model)
         {
-            var currentUser = _sessionService.GetUser();
+            var u_id = GetCurrentu_id();
 
-            if (currentUser == null)
+            if (u_id == null)
             {
-                return Unauthorized();
+                return RedirectToAction(
+                    "Login",
+                    "User");
             }
 
             var dto = new CreatePostDTO
@@ -115,7 +114,8 @@ namespace PosWebApplication.Controllers
                 public_flag = model.public_flag
             };
 
-            var validationResult = _createValidator.Validate(dto);
+            var validationResult =
+                _createValidator.Validate(dto);
 
             if (!validationResult.IsValid)
             {
@@ -123,8 +123,7 @@ namespace PosWebApplication.Controllers
                 {
                     ModelState.AddModelError(
                         error.PropertyName,
-                        error.ErrorMessage
-                    );
+                        error.ErrorMessage);
                 }
 
                 return View(model);
@@ -132,33 +131,159 @@ namespace PosWebApplication.Controllers
 
             _postService.Create(
                 dto,
-                currentUser.u_id
-            );
+                u_id.Value);
 
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(
+                nameof(Index));
+        }
+
+        [HttpGet]
+        public IActionResult Edit(int id)
+        {
+            var u_id = GetCurrentu_id();
+
+            if (u_id == null)
+            {
+                return RedirectToAction(
+                    "Login",
+                    "User");
+            }
+
+            var post = _postService
+                .GetMyPosts(u_id.Value)
+                .FirstOrDefault(x => x.p_id == id);
+
+            if (post == null)
+            {
+                throw new NotFoundException(
+           "Post not found.");
+            }
+
+            var model = new EditPostViewModel
+            {
+                p_id = post.p_id,
+                title = post.title,
+                description = post.description,
+                public_flag = post.public_flag
+            };
+
+            return View(model);
+        }
+
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Edit(
+            EditPostViewModel model)
+        {
+            var u_id = GetCurrentu_id();
+
+            if (u_id == null)
+            {
+                return RedirectToAction(
+                    "Login",
+                    "User");
+            }
+
+            var dto = new UpdatePostDTO
+            {
+                p_id = model.p_id,
+                title = model.title,
+                description = model.description,
+                public_flag = model.public_flag
+            };
+
+            var validationResult =
+                _updateValidator.Validate(dto);
+
+            if (!validationResult.IsValid)
+            {
+                foreach (var error in validationResult.Errors)
+                {
+                    ModelState.AddModelError(
+                        error.PropertyName,
+                        error.ErrorMessage);
+                }
+
+                return View(model);
+            }
+
+            try
+            {
+                _postService.Update(
+                    dto,
+                    u_id.Value);
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+        }
+
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Delete(int id)
+        {
+            var u_id = GetCurrentu_id();
+
+            if (u_id == null)
+            {
+                return RedirectToAction(
+                    "Login",
+                    "User");
+            }
+
+            try
+            {
+                _postService.Delete(
+                    id,
+                    u_id.Value);
+
+                return RedirectToAction(
+                    nameof(Index));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
         }
 
         [HttpGet]
         public IActionResult Details(int id)
         {
-            var currentUser = _sessionService.GetUser();
+            var u_id = GetCurrentu_id();
 
-            if (currentUser == null)
+            if (u_id == null)
             {
-                return RedirectToAction("Login", "User");
+                return RedirectToAction(
+                    "Login",
+                    "User");
             }
 
             var post = _postService.GetPost(
                 id,
-                currentUser.u_id
-            );
+                u_id.Value);
 
             if (post == null)
             {
-                throw new NotFoundException("Post not found.");
+                throw new NotFoundException(
+                    "Post not found.");
             }
 
-            var comments = _commentService.GetByPostId(id);
+            var comments =
+                _commentService.GetByPostId(id);
 
             var model = new PostDetailsViewModel
             {
@@ -185,128 +310,19 @@ namespace PosWebApplication.Controllers
             return View(model);
         }
 
-        [HttpGet]
-        public IActionResult Edit(int id)
-        {
-            var currentUser = _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
-
-            var post = _postService
-                .GetMyPosts(currentUser.u_id)
-                .FirstOrDefault(x => x.p_id == id);
-
-            if (post == null)
-            {
-                return NotFound();
-            }
-
-            var model = new EditPostViewModel
-            {
-                p_id = post.p_id,
-                title = post.title,
-                description = post.description,
-                public_flag = post.public_flag
-            };
-
-            return View(model);
-        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(EditPostViewModel model)
+        public IActionResult AddComment(
+            CreateCommentDTO model)
         {
-            var currentUser = _sessionService.GetUser();
+            var u_id = GetCurrentu_id();
 
-            if (currentUser == null)
+            if (u_id == null)
             {
-                return Unauthorized();
-            }
-
-            var dto = new UpdatePostDTO
-            {
-                p_id = model.p_id,
-                title = model.title,
-                description = model.description,
-                public_flag = model.public_flag
-            };
-
-            var validationResult = _updateValidator.Validate(dto);
-
-            if (!validationResult.IsValid)
-            {
-                foreach (var error in validationResult.Errors)
-                {
-                    ModelState.AddModelError(
-                        error.PropertyName,
-                        error.ErrorMessage
-                    );
-                }
-
-                return View(model);
-            }
-
-            try
-            {
-                _postService.Update(
-                    dto,
-                    currentUser.u_id
-                );
-
-                return RedirectToAction(nameof(Index));
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Delete(int id)
-        {
-            var currentUser = _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
-
-            try
-            {
-                _postService.Delete(
-                    id,
-                    currentUser.u_id
-                );
-
-                return RedirectToAction(nameof(Index));
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult AddComment(CreateCommentDTO model)
-        {
-            var currentUser = _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return Unauthorized();
+                return RedirectToAction(
+                    "Login",
+                    "User");
             }
 
             var validationResult =
@@ -318,20 +334,17 @@ namespace PosWebApplication.Controllers
                 {
                     ModelState.AddModelError(
                         error.PropertyName,
-                        error.ErrorMessage
-                    );
+                        error.ErrorMessage);
                 }
 
                 return RedirectToAction(
                     nameof(Details),
-                    new { id = model.p_id }
-                );
+                    new { id = model.p_id });
             }
 
             var post = _postService.GetPost(
                 model.p_id,
-                currentUser.u_id
-            );
+                u_id.Value);
 
             if (post == null)
             {
@@ -345,13 +358,31 @@ namespace PosWebApplication.Controllers
 
             _commentService.Create(
                 model,
-                currentUser.u_id
-            );
+                u_id.Value);
 
             return RedirectToAction(
                 nameof(Details),
-                new { id = model.p_id }
-            );
+                new { id = model.p_id });
+        }
+
+        private int? GetCurrentu_id()
+        {
+            var claim = User.FindFirst(
+                ClaimTypes.NameIdentifier);
+
+            if (claim == null)
+            {
+                return null;
+            }
+
+            if (!int.TryParse(
+                claim.Value,
+                out var u_id))
+            {
+                return null;
+            }
+
+            return u_id;
         }
     }
 }

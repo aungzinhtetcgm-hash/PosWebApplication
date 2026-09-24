@@ -1,110 +1,57 @@
-using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using PosWebApplication.Entity;
-using PosWebApplication.Constraints;
-using PosWebApplication.DAO.CommentDAO;
-using PosWebApplication.DAO.PostDAO;
-using PosWebApplication.DAO.UserDAO;
-using PosWebApplication.DTOs.Comment;
-using PosWebApplication.DTOs.Post;
-using PosWebApplication.FluentValidators.Comment;
-using PosWebApplication.FluentValidators.Post;
-using PosWebApplication.Helper;
+using POS_Retails.Entity;
 using PosWebApplication.Middlewares;
 using PosWebApplication.PosStartUp;
-using PosWebApplication.Services;
-using PosWebApplication.Services.Admin;
-using PosWebApplication.Services.Comment;
-using PosWebApplication.Services.Post;
-using PosWebApplication.Services.User;
-using POS_Retails.Entity;
+using PosWebApplication.Extensions;
+using PosWebApplication.Middlewares;
+using PosWebApplication.PosStartUp;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// MVC
 builder.Services.AddControllersWithViews();
 
-
-// MariaDB Connection
+// MariaDB
 var connectionString =
     builder.Configuration.GetConnectionString("MariaDb");
 
-builder.Services.AddDbContext<pos_saas_entities>(options =>
-    options.UseMySql(
-        connectionString,
-        ServerVersion.AutoDetect(connectionString)
-    ));
+builder.Services.AddDbContext<pos_saas_entities>(
+    options =>
+        options.UseMySql(
+            connectionString,
+            ServerVersion.AutoDetect(connectionString)
+        ));
 
+// Authentication & Authorization
+builder.Services.ConfigurePosWebApplicationAuthentication();
 
 // HttpContext
 builder.Services.AddHttpContextAccessor();
 
+// Dependency Injection
+builder.Services.AddPosWebApplicationServices();
 
-// Session
-builder.Services.AddDistributedMemoryCache();
-
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-});
-
-
-// Services
-builder.Services.AddScoped<SessionService>();
-
-builder.Services.AddScoped<IUserDAO, UserDAO>();
-builder.Services.AddScoped<IUserService, UserService>();
-
-builder.Services.AddScoped<IAdminService, AdminService>();
-
-builder.Services.AddScoped<IPostDAO, PostDAO>();
-builder.Services.AddScoped<IPostService, PostService>();
-
-builder.Services.AddScoped<ICommentDAO, CommentDAO>();
-builder.Services.AddScoped<ICommentService, CommentService>();
-
-builder.Services.AddScoped<FilePathHelper>();
-
-
-// FluentValidation
-builder.Services.AddScoped<
-    IValidator<CreatePostDTO>,
-    CreatePostValidator>();
-
-builder.Services.AddScoped<
-    IValidator<UpdatePostDTO>,
-    UpdatePostValidator>();
-
-builder.Services.AddScoped<
-    IValidator<CreateCommentDTO>,
-    CreateCommentValidator>();
-
-
+// Build
 var app = builder.Build();
 
-
-// ==============================
 // Admin Seed
-// ==============================
-
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider
-        .GetRequiredService<pos_saas_entities>();
+    var context =
+        scope.ServiceProvider
+            .GetRequiredService<pos_saas_entities>();
 
     await AdminSeedData.InitializeAsync(context);
 }
 
+// Global Exception
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
-// ==============================
 // HTTP Request Pipeline
-// ==============================
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
+
     app.UseHsts();
 }
 
@@ -114,14 +61,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseSession();
+// Authentication
+app.UseAuthentication();
 
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-
-app.UseMiddleware<AuthenticationMiddleware>();
-
+// Authorization
 app.UseAuthorization();
 
+// Routing
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

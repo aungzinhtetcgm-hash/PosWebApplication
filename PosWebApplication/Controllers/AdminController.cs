@@ -1,43 +1,28 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using PosWebApplication.Constraints;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PosWebApplication.DAO.UserDAO;
-using PosWebApplication.Services;
 using PosWebApplication.Services.Admin;
 using PosWebApplication.ViewModels.Admin;
 
-namespace PosWebApplication.Controller
+namespace PosWebApplication.Controllers
 {
-    public class AdminController : Microsoft.AspNetCore.Mvc.Controller
+    [Authorize(Roles = "1")]
+    public class AdminController : BaseController
     {
         private readonly IUserDAO _userDAO;
         private readonly IAdminService _adminService;
-        private readonly SessionService _sessionService;
 
         public AdminController(
             IUserDAO userDAO,
-            IAdminService adminService,
-            SessionService sessionService)
+            IAdminService adminService)
         {
             _userDAO = userDAO;
             _adminService = adminService;
-            _sessionService = sessionService;
         }
 
         [HttpGet]
         public IActionResult Dashboard()
         {
-            var currentUser = _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return RedirectToAction("Login", "User");
-            }
-
-            if (currentUser.role != UserRoles.Admin)
-            {
-                return RedirectToAction("Index", "Home");
-            }
-
             var users = _userDAO.GetAll();
 
             var viewModel = new AdminDashboardViewModel
@@ -49,43 +34,47 @@ namespace PosWebApplication.Controller
         }
 
         [HttpPost]
-        public IActionResult MakeAdmin(int userId)
+        [ValidateAntiForgeryToken]
+        public IActionResult MakeAdmin(int u_id)
         {
-            var currentUser = _sessionService.GetUser();
+            var result = _adminService.MakeAdmin(u_id);
 
-            if (currentUser == null)
+            if (!result)
             {
-                return RedirectToAction("Login", "User");
+                WarningMessage(
+                    "User could not be updated.");
+
+                return RedirectToAction(
+                    nameof(Dashboard));
             }
 
-            if (currentUser.role != UserRoles.Admin)
-            {
-                return RedirectToAction("Index", "Home");
-            }
+            SuccessMessage(
+                "User has been updated to Admin.");
 
-            _adminService.MakeAdmin(userId);
-
-            return RedirectToAction("Dashboard");
+            return RedirectToAction(
+                nameof(Dashboard));
         }
 
         [HttpPost]
-        public IActionResult DeleteUser(int userId)
+        [ValidateAntiForgeryToken]
+        public IActionResult DeleteUser(int u_id)
         {
-            var currentUser = _sessionService.GetUser();
+            var result = _adminService.DeleteUser(u_id);
 
-            if (currentUser == null)
+            if (!result)
             {
-                return RedirectToAction("Login", "User");
+                WarningMessage(
+                    "User could not be deleted.");
+
+                return RedirectToAction(
+                    nameof(Dashboard));
             }
 
-            if (currentUser.role != UserRoles.Admin)
-            {
-                return RedirectToAction("Index", "Home");
-            }
+            SuccessMessage(
+                "User deleted successfully.");
 
-            _adminService.DeleteUser(userId);
-
-            return RedirectToAction("Dashboard");
+            return RedirectToAction(
+                nameof(Dashboard));
         }
     }
 }

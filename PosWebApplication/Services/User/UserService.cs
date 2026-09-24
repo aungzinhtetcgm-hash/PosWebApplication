@@ -3,6 +3,7 @@ using PosWebApplication.Constraints;
 using PosWebApplication.DAO.UserDAO;
 using PosWebApplication.DTOs.User;
 using PosWebApplication.Entity;
+using PosWebApplication.Services.User;
 
 namespace PosWebApplication.Services.User
 {
@@ -32,7 +33,9 @@ namespace PosWebApplication.Services.User
                 email = model.Email,
                 role = UserRoles.User,
                 created_by = 0,
-                created_at = DateTime.Now
+                updated_by = 0,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
             };
 
             newUser.password =
@@ -67,6 +70,11 @@ namespace PosWebApplication.Services.User
             }
 
             return existingUser;
+        }
+
+        public user? GetById(int u_id)
+        {
+            return _userDAO.GetById(u_id);
         }
 
         public void UpdateProfile(user user)

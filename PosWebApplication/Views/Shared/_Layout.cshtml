@@ -1,16 +1,29 @@
-﻿@using PosWebApplication.Services
-@inject SessionService SessionService
+﻿@using System.Security.Claims
+@using PosWebApplication.Constraints
 
 @{
-    var currentUser = SessionService.GetUser();
+    var isLoggedIn =
+        User.Identity?.IsAuthenticated == true;
 
-    string profileImage = "/images/default_Image.jpg";
+    var userName =
+        User.FindFirst(ClaimTypes.Name)?.Value
+        ?? "User";
 
-    if (currentUser != null &&
-        !string.IsNullOrWhiteSpace(currentUser.img))
+    var profileImage =
+        User.FindFirst("ProfileImage")?.Value;
+
+    var profileImagePath =
+        "/images/default_Image.jpg";
+
+    if (!string.IsNullOrWhiteSpace(profileImage))
     {
-        profileImage = $"/images/users/{currentUser.img}";
+        profileImagePath =
+            $"/images/users/{profileImage}";
     }
+
+    var isAdmin =
+        User.IsInRole(
+            UserRoles.Admin.ToString());
 }
 
 <!DOCTYPE html>
@@ -36,7 +49,6 @@
 
 </head>
 
-
 <body>
 
     <header>
@@ -45,6 +57,8 @@
 
             <div class="container">
 
+                <!-- Brand -->
+
                 <a class="navbar-brand"
                    asp-controller="Home"
                    asp-action="Index">
@@ -52,6 +66,9 @@
                     PosWebApplication
 
                 </a>
+
+
+                <!-- Mobile Button -->
 
                 <button class="navbar-toggler"
                         type="button"
@@ -65,10 +82,17 @@
 
                 </button>
 
+
+                <!-- Navbar Content -->
+
                 <div class="collapse navbar-collapse"
                      id="navbarContent">
 
+                    <!-- Left Menu -->
+
                     <ul class="navbar-nav me-auto">
+
+                        <!-- Home -->
 
                         <li class="nav-item">
 
@@ -82,15 +106,37 @@
 
                         </li>
 
-                        @if (currentUser != null)
+
+                        @if (isLoggedIn)
                         {
+                            <!-- Posts -->
+
                             <li class="nav-item">
 
                                 <a class="nav-link"
                                    asp-controller="Post"
                                    asp-action="Index">
 
-                                    Post
+                                    Posts
+
+                                </a>
+
+                            </li>
+
+                        }
+
+
+                        @if (isAdmin)
+                        {
+                            <!-- Admin -->
+
+                            <li class="nav-item">
+
+                                <a class="nav-link"
+                                   asp-controller="Admin"
+                                   asp-action="Dashboard">
+
+                                    Admin Dashboard
 
                                 </a>
 
@@ -99,11 +145,15 @@
 
                     </ul>
 
+
+                    <!-- Right Menu -->
+
                     <ul class="navbar-nav align-items-center">
 
-
-                        @if (currentUser == null)
+                        @if (!isLoggedIn)
                         {
+                            <!-- Register -->
+
                             <li class="nav-item">
 
                                 <a class="nav-link"
@@ -133,19 +183,21 @@
                         }
                         else
                         {
+                            <!-- Profile Image -->
+
                             <li class="nav-item me-2">
 
                                 <a asp-controller="User"
                                    asp-action="Profile"
                                    title="User Profile">
 
-                                    <img src="@profileImage"
+                                    <img src="@profileImagePath"
                                          alt="Profile"
                                          width="40"
                                          height="40"
+                                         class="rounded-circle"
                                          style="
                                     object-fit: cover;
-                                    border-radius: 50%;
                                     cursor: pointer;
                                     " />
 
@@ -153,15 +205,23 @@
 
                             </li>
 
+
+                            <!-- User Name -->
+
                             <li class="nav-item">
 
-                                <span class="nav-link">
+                                <a class="nav-link"
+                                   asp-controller="User"
+                                   asp-action="Profile">
 
-                                    @currentUser.name
+                                    @userName
 
-                                </span>
+                                </a>
 
                             </li>
+
+
+                            <!-- Logout -->
 
                             <li class="nav-item">
 
@@ -194,6 +254,9 @@
 
     </header>
 
+
+    <!-- Main Content -->
+
     <div class="container">
 
         <main role="main"
@@ -206,6 +269,8 @@
     </div>
 
 
+    <!-- Footer -->
+
     <footer class="border-top footer text-muted">
 
         <div class="container">
@@ -215,6 +280,9 @@
         </div>
 
     </footer>
+
+
+    <!-- Scripts -->
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
 
@@ -227,8 +295,7 @@
 
     @await RenderSectionAsync(
         "Scripts",
-        required: false
-    )
+        required: false)
 
 </body>
 
