@@ -1,35 +1,38 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PosWebApplication.Constraints;
+using PosWebApplication.Controllers;
 using PosWebApplication.DTOs.User;
 using PosWebApplication.Entity;
 using PosWebApplication.Helper;
-using PosWebApplication.Services;
 using PosWebApplication.Services.User;
+using System.Security.Claims;
 
 namespace PosWebApplication.Controllers
 {
-    public class UserController : Microsoft.AspNetCore.Mvc.Controller
+    public class UserController : BaseController
     {
         private readonly IUserService _userService;
-        private readonly SessionService _sessionService;
         private readonly FilePathHelper _filePathHelper;
 
         public UserController(
             IUserService userService,
-            SessionService sessionService,
             FilePathHelper filePathHelper)
         {
             _userService = userService;
-            _sessionService = sessionService;
             _filePathHelper = filePathHelper;
         }
 
+        [AllowAnonymous]
         [HttpGet]
         public IActionResult Register()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult Register(RegisterDTO model)
@@ -51,17 +54,25 @@ namespace PosWebApplication.Controllers
                 return View(model);
             }
 
-            return RedirectToAction("Login");
+            SuccessMessage(
+                "Registration successful.");
+
+            return RedirectToAction(
+                nameof(Login));
         }
 
+        [AllowAnonymous]
         [HttpGet]
         public IActionResult Login()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [HttpPost]
-        public IActionResult Login(LoginDTO model)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Login(
+            LoginDTO model)
         {
             if (!ModelState.IsValid)
             {
@@ -73,13 +84,43 @@ namespace PosWebApplication.Controllers
             if (user == null)
             {
                 ModelState.AddModelError(
-                    "",
+                    string.Empty,
                     "Invalid email or password.");
 
                 return View(model);
             }
 
-            _sessionService.SetUser(user);
+            var claims = new List<Claim>
+            {
+                new Claim(
+                    ClaimTypes.NameIdentifier,
+                    user.u_id.ToString()),
+
+                new Claim(
+                    ClaimTypes.Name,
+                    user.name ?? string.Empty),
+
+                new Claim(
+                    ClaimTypes.Email,
+                    user.email ?? string.Empty),
+
+                new Claim(
+                    ClaimTypes.Role,
+                    user.role.ToString())
+            };
+
+            var identity = new ClaimsIdentity(
+                claims,
+                CookieAuthenticationDefaults
+                    .AuthenticationScheme);
+
+            var principal = new ClaimsPrincipal(
+                identity);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults
+                    .AuthenticationScheme,
+                principal);
 
             if (user.role == UserRoles.Admin)
             {
@@ -89,49 +130,64 @@ namespace PosWebApplication.Controllers
             }
 
             return RedirectToAction(
-                "UserDashboard",
-                "User");
+                nameof(UserDashboard));
         }
 
+        // User Dashboard
 
+        [Authorize]
         [HttpGet]
         public IActionResult UserDashboard()
         {
-            var currentUser =
-                _sessionService.GetUser();
-
-            if (currentUser == null)
-            {
-                return RedirectToAction("Login");
-            }
-
             return View();
         }
 
+        // Profile
+
+        [Authorize]
         [HttpGet]
         public IActionResult Profile()
         {
+            var userId = GetCurrentUserId();
+
+            if (userId == null)
+            {
+                return RedirectToAction(
+                    nameof(Login));
+            }
+
             var currentUser =
-                _sessionService.GetUser();
+                _userService.GetById(userId.Value);
 
             if (currentUser == null)
             {
-                return RedirectToAction("Login");
+                return NotFound();
             }
 
             return View(currentUser);
         }
 
+        [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Profile(user model, IFormFile? image)
+        public async Task<IActionResult> Profile(
+            user model,
+            IFormFile? image)
         {
+            var userId = GetCurrentUserId();
+
+            if (userId == null)
+            {
+                return RedirectToAction(
+                    nameof(Login));
+            }
+
             var currentUser =
-                _sessionService.GetUser();
+                _userService.GetById(userId.Value);
 
             if (currentUser == null)
             {
-                return RedirectToAction("Login");
+                return NotFound();
             }
 
             if (image != null && image.Length > 0)
@@ -141,16 +197,17 @@ namespace PosWebApplication.Controllers
 
                 string[] allowedExtensions =
                 {
-            ".jpg",
-            ".jpeg",
-            ".png"
-        };
+                    ".jpg",
+                    ".jpeg",
+                    ".png"
+                };
 
                 string extension =
                     Path.GetExtension(image.FileName)
                         .ToLowerInvariant();
 
-                if (!allowedExtensions.Contains(extension))
+                if (!allowedExtensions.Contains(
+                    extension))
                 {
                     ModelState.AddModelError(
                         "image",
@@ -175,7 +232,8 @@ namespace PosWebApplication.Controllers
 
                 if (!Directory.Exists(uploadPath))
                 {
-                    Directory.CreateDirectory(uploadPath);
+                    Directory.CreateDirectory(
+                        uploadPath);
                 }
 
                 string fileName =
@@ -184,11 +242,10 @@ namespace PosWebApplication.Controllers
                 string filePath =
                     Path.Combine(
                         uploadPath,
-                        fileName
-                    );
+                        fileName);
 
-                using (var stream =
-                    new FileStream(
+                await using (
+                    var stream = new FileStream(
                         filePath,
                         FileMode.Create))
                 {
@@ -197,21 +254,60 @@ namespace PosWebApplication.Controllers
 
                 currentUser.img = fileName;
 
-                _userService.UpdateProfile(currentUser);
-
-                _sessionService.SetUser(currentUser);
+                _userService.UpdateProfile(
+                    currentUser);
             }
 
-            return RedirectToAction("UserDashboard");
+            SuccessMessage(
+                "Profile updated successfully.");
+
+            return RedirectToAction(
+                nameof(UserDashboard));
         }
 
+        // Logout
+
+        [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            _sessionService.Clear();
+            await HttpContext.SignOutAsync(
+                CookieAuthenticationDefaults
+                    .AuthenticationScheme);
 
-            return RedirectToAction("Login");
+            SuccessMessage(
+                "Logout successful.");
+
+            return RedirectToAction(
+                nameof(Login));
+        }
+
+        [AllowAnonymous]
+        [HttpGet]
+        public IActionResult AccessDenied()
+        {
+            return View();
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst(
+                ClaimTypes.NameIdentifier);
+
+            if (claim == null)
+            {
+                return null;
+            }
+
+            if (!int.TryParse(
+                claim.Value,
+                out var userId))
+            {
+                return null;
+            }
+
+            return userId;
         }
     }
 }

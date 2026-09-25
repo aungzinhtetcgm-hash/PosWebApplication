@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using PosWebApplication.Models;
+using PosWebApplication.Services.Post;
+using PosWebApplication.ViewModels.Post;
 using System.Diagnostics;
+using PosWebApplication.Models;
 using PosWebApplication.Services.Post;
 using PosWebApplication.ViewModels.Post;
 
 namespace PosWebApplication.Controllers
 {
-    public class HomeController : Microsoft.AspNetCore.Mvc.Controller
+    public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
-
         private readonly IPostService _postService;
 
         public HomeController(
@@ -17,7 +19,6 @@ namespace PosWebApplication.Controllers
             IPostService postService)
         {
             _logger = logger;
-
             _postService = postService;
         }
 
@@ -25,7 +26,6 @@ namespace PosWebApplication.Controllers
         {
             var publicPosts =
                 _postService.GetPublicPosts();
-
 
             var model = publicPosts
                 .Select(x => new PublicPostViewModel
@@ -63,7 +63,8 @@ namespace PosWebApplication.Controllers
 
         public IActionResult TestError()
         {
-            throw new Exception("This is a test error.");
+            throw new Exception(
+                "This is a test error.");
         }
     }
 }

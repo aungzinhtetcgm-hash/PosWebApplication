@@ -7,6 +7,7 @@ namespace PosWebApplication.Services.User
     {
         bool Register(RegisterDTO model);
         user? Login(LoginDTO model);
+        user? GetById(int u_id);
         void UpdateProfile(user user);
     }
 }
