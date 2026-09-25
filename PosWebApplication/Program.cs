@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using POS_Retails.Entity;
 using PosWebApplication.Middlewares;
 using PosWebApplication.PosStartUp;
@@ -8,37 +9,79 @@ using PosWebApplication.PosStartUp;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MVC
+
 builder.Services.AddControllersWithViews();
 
-// ApiSwagger
+// Swagger
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    // JWT Bearer Definition
+    options.AddSecurityDefinition(
+        "Bearer",
+        new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+
+            Type = SecuritySchemeType.Http,
+
+            Scheme = "bearer",
+
+            BearerFormat = "JWT",
+
+            In = ParameterLocation.Header,
+
+            Description =
+                "Enter your JWT token."
+        });
+
+
+    // JWT Bearer Requirement
+    options.AddSecurityRequirement(
+        document =>
+            new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(
+                    "Bearer",
+                    document)]
+                    = []
+            });
+});
 
 // MariaDB
+
 var connectionString =
-    builder.Configuration.GetConnectionString("MariaDb");
+    builder.Configuration
+        .GetConnectionString("MariaDb");
 
 builder.Services.AddDbContext<pos_saas_entities>(
     options =>
         options.UseMySql(
             connectionString,
-            ServerVersion.AutoDetect(connectionString)
+            ServerVersion.AutoDetect(
+                connectionString)
         ));
 
 // Authentication & Authorization
-builder.Services.ConfigurePosWebApplicationAuthentication(builder.Configuration);
+
+builder.Services.ConfigurePosWebApplicationAuthentication(
+    builder.Configuration);
 
 // HttpContext
-builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddHttpContextAccessor();
 // Dependency Injection
+
 builder.Services.AddPosWebApplicationServices();
 
 // Build
+
 var app = builder.Build();
 
 // Admin Seed
+
 using (var scope = app.Services.CreateScope())
 {
     var context =
@@ -49,21 +92,25 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Global Exception
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+
+app.UseMiddleware<
+    GlobalExceptionHandlingMiddleware>();
 
 // HTTP Request Pipeline
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
+
     app.UseSwaggerUI();
 }
-
 else
 {
     app.UseExceptionHandler("/Home/Error");
+
     app.UseHsts();
 }
+
 
 app.UseHttpsRedirection();
 
@@ -72,14 +119,19 @@ app.UseStaticFiles();
 app.UseRouting();
 
 // Authentication
+
 app.UseAuthentication();
 
 // Authorization
+
 app.UseAuthorization();
 
-// Routing
+// MVC Routing
+
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern:
+        "{controller=Home}/{action=Index}/{id?}");
+
 
 app.Run();
