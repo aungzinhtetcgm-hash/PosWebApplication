@@ -11,6 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 // MVC
 builder.Services.AddControllersWithViews();
 
+// ApiSwagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 // MariaDB
 var connectionString =
     builder.Configuration.GetConnectionString("MariaDb");
@@ -23,7 +27,7 @@ builder.Services.AddDbContext<pos_saas_entities>(
         ));
 
 // Authentication & Authorization
-builder.Services.ConfigurePosWebApplicationAuthentication();
+builder.Services.ConfigurePosWebApplicationAuthentication(builder.Configuration);
 
 // HttpContext
 builder.Services.AddHttpContextAccessor();
@@ -48,10 +52,16 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 // HTTP Request Pipeline
-if (!app.Environment.IsDevelopment())
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+else
 {
     app.UseExceptionHandler("/Home/Error");
-
     app.UseHsts();
 }
 

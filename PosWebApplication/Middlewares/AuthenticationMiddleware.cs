@@ -1,6 +1,6 @@
 ﻿using PosWebApplication.Services;
 
-namespace PosWebApplication.Middlewares
+namespace PosWebApplicatioin.Middlewares
 {
     public class AuthenticationMiddleware
     {
